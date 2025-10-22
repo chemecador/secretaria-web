@@ -8,9 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/useAuth";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
-import Lists from "./pages/Lists";
-import Notes from "./pages/Notes";
-import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -40,9 +38,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/listas" />} />
-            <Route path="listas" element={<Lists />} />
-            <Route path="notas" element={<Notes />} />
+            <Route index element={<Dashboard />} />
           </Route>
         </Routes>
       </Router>

@@ -11,13 +11,15 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
-function Lists() {
+function Dashboard() {
   const { user } = useAuth();
   const [lists, setLists] = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [notes, setNotes] = useState([]);
   const [newListTitle, setNewListTitle] = useState("");
   const [newNoteText, setNewNoteText] = useState("");
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [showNoteForm, setShowNoteForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingNotes, setLoadingNotes] = useState(false);
 
@@ -91,7 +93,7 @@ function Lists() {
 
     const newNote = {
       title: newNoteText,
-      content: "",
+      content: newNoteContent,
       completed: false,
       color: -1,
       order: 0,
@@ -110,6 +112,8 @@ function Lists() {
       );
       await addDoc(notesRef, newNote);
       setNewNoteText("");
+      setNewNoteContent("");
+      setShowNoteForm(false);
     } catch (error) {
       console.error("Error al agregar nota:", error);
     }
@@ -208,23 +212,81 @@ function Lists() {
           </button>
         </div>
 
-        {/* Formulario para agregar nota */}
-        <form onSubmit={handleAddNote} className="card">
-          <h2 className="text-xl font-semibold mb-4">Agregar nueva nota</h2>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-              placeholder="Escribe tu nota..."
-              className="input flex-1"
-              autoFocus
-            />
-            <button type="submit" className="btn-primary">
-              Agregar
-            </button>
-          </div>
-        </form>
+        {/* Botón o Formulario para agregar nota */}
+        {!showNoteForm ? (
+          <button
+            onClick={() => setShowNoteForm(true)}
+            className="btn-primary w-full py-3"
+          >
+            ➕ Agregar nueva nota
+          </button>
+        ) : (
+          <form onSubmit={handleAddNote} className="card">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">✍️ Agregar nueva nota</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoteForm(false);
+                  setNewNoteText("");
+                  setNewNoteContent("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                title="Cancelar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Título
+                </label>
+                <input
+                  type="text"
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  placeholder="Escribe el título de la nota..."
+                  className="input w-full"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contenido (opcional)
+                </label>
+                <textarea
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  placeholder="Escribe el contenido de la nota..."
+                  rows="4"
+                  className="input resize-none w-full"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={!newNoteText.trim()}
+                >
+                  ➕ Agregar Nota
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNoteForm(false);
+                    setNewNoteText("");
+                    setNewNoteContent("");
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
 
         {/* Lista de notas */}
         {loadingNotes ? (
@@ -247,23 +309,34 @@ function Lists() {
               {sortedNotes.map((note) => (
                 <div
                   key={note.id}
-                  className="flex items-center gap-3 p-3 rounded hover:bg-gray-50 border border-gray-200"
+                  className="flex items-start gap-3 p-3 rounded hover:bg-gray-50 border border-gray-200"
                 >
                   <input
                     type="checkbox"
                     checked={note.completed}
                     onChange={() => handleToggleNote(note)}
-                    className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                    className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 mt-1"
                   />
-                  <span
-                    className={`flex-1 ${
-                      note.completed
-                        ? "line-through text-gray-400"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {note.title}
-                  </span>
+                  <div className="flex-1">
+                    <div
+                      className={`font-medium ${
+                        note.completed
+                          ? "line-through text-gray-400"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {note.title}
+                    </div>
+                    {note.content && (
+                      <div
+                        className={`text-sm mt-1 ${
+                          note.completed ? "text-gray-300" : "text-gray-500"
+                        }`}
+                      >
+                        {note.content}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleDeleteNote(note)}
                     className="text-red-400 hover:text-red-600 text-sm px-2"
@@ -348,4 +421,4 @@ function Lists() {
   );
 }
 
-export default Lists;
+export default Dashboard;
