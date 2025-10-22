@@ -40,7 +40,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Home />} />
+            <Route index element={<Navigate to="/listas" />} />
             <Route path="listas" element={<Lists />} />
             <Route path="notas" element={<Notes />} />
           </Route>

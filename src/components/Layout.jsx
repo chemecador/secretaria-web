@@ -27,20 +27,13 @@ function Layout() {
           <div className="flex justify-between items-center h-16">
             {/* Logo y navegación */}
             <div className="flex items-center space-x-8">
-              <Link to="/" className="text-2xl font-bold text-primary-600">
+              <Link
+                to="/listas"
+                className="text-2xl font-bold text-primary-600"
+              >
                 📝 Secretaria
               </Link>
               <nav className="hidden md:flex space-x-4">
-                <Link
-                  to="/"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive("/")
-                      ? "bg-primary-100 text-primary-700"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  Inicio
-                </Link>
                 <Link
                   to="/listas"
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
