@@ -22,6 +22,10 @@ function Dashboard() {
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [editingNote, setEditingNote] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editCompleted, setEditCompleted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -158,6 +162,48 @@ function Dashboard() {
     } catch (error) {
       console.error("Error al eliminar nota:", error);
     }
+  };
+
+  const handleStartEdit = (note) => {
+    setEditingNote(note);
+    setEditTitle(note.title);
+    setEditContent(note.content || "");
+    setEditCompleted(note.completed || false);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editTitle.trim() || !editingNote || !selectedList) return;
+
+    try {
+      const noteRef = doc(
+        db,
+        "users",
+        user.uid,
+        "noteslist",
+        selectedList.id,
+        "notes",
+        editingNote.id
+      );
+      await updateDoc(noteRef, {
+        title: editTitle,
+        content: editContent,
+        completed: editCompleted,
+      });
+      setEditingNote(null);
+      setEditTitle("");
+      setEditContent("");
+      setEditCompleted(false);
+    } catch (error) {
+      console.error("Error al actualizar nota:", error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNote(null);
+    setEditTitle("");
+    setEditContent("");
+    setEditCompleted(false);
   };
 
   const handleDeleteList = async (listId) => {
@@ -307,43 +353,130 @@ function Dashboard() {
             </h3>
             <div className="space-y-2">
               {sortedNotes.map((note) => (
-                <div
-                  key={note.id}
-                  className="flex items-start gap-3 p-3 rounded hover:bg-gray-50 border border-gray-200"
-                >
-                  <input
-                    type="checkbox"
-                    checked={note.completed}
-                    onChange={() => handleToggleNote(note)}
-                    className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 mt-1"
-                  />
-                  <div className="flex-1">
-                    <div
-                      className={`font-medium ${
-                        note.completed
-                          ? "line-through text-gray-400"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {note.title}
+                <div key={note.id}>
+                  {editingNote?.id === note.id ? (
+                    // Formulario de edición
+                    <div className="p-4 rounded border-2 border-primary-500 bg-primary-50">
+                      <form onSubmit={handleSaveEdit}>
+                        <div className="space-y-3">
+                          {/* Checkbox de completado */}
+                          <div className="flex items-center gap-2 pb-3 border-b border-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={editCompleted}
+                              onChange={(e) => setEditCompleted(e.target.checked)}
+                              className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                              id={`completed-${note.id}`}
+                            />
+                            <label
+                              htmlFor={`completed-${note.id}`}
+                              className="text-sm font-medium text-gray-700 cursor-pointer"
+                            >
+                              Marcar como completada
+                            </label>
+                          </div>
+
+                          {/* Campo de título */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Título
+                            </label>
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              className="input w-full"
+                              autoFocus
+                              required
+                            />
+                          </div>
+
+                          {/* Campo de contenido */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Contenido (opcional)
+                            </label>
+                            <textarea
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              rows="3"
+                              className="input resize-none w-full"
+                            />
+                          </div>
+
+                          {/* Botones de acción */}
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              className="btn-primary flex-1"
+                              disabled={!editTitle.trim()}
+                            >
+                              💾 Guardar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="btn-secondary flex-1"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+
+                          {/* Botón de eliminar */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDeleteNote(note);
+                              setEditingNote(null);
+                            }}
+                            className="w-full text-red-500 hover:text-red-700 hover:bg-red-50 py-2 rounded border border-red-300 text-sm font-medium transition-colors"
+                          >
+                            🗑️ Eliminar nota
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    {note.content && (
-                      <div
-                        className={`text-sm mt-1 ${
-                          note.completed ? "text-gray-300" : "text-gray-500"
-                        }`}
-                      >
-                        {note.content}
+                  ) : (
+                    // Vista normal de la nota - solo lectura
+                    <div
+                      className="flex items-start gap-3 p-3 rounded hover:bg-gray-50 border border-gray-200 cursor-pointer transition-colors"
+                      onClick={() => handleStartEdit(note)}
+                    >
+                      {/* Indicador visual de completado */}
+                      <div className="w-5 h-5 mt-1 flex-shrink-0">
+                        {note.completed ? (
+                          <span className="text-green-500 text-xl">✓</span>
+                        ) : (
+                          <span className="text-gray-300 text-xl">○</span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDeleteNote(note)}
-                    className="text-red-400 hover:text-red-600 text-sm px-2"
-                    title="Eliminar nota"
-                  >
-                    🗑️
-                  </button>
+
+                      {/* Contenido de la nota */}
+                      <div className="flex-1">
+                        <div
+                          className={`font-medium ${
+                            note.completed
+                              ? "line-through text-gray-400"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {note.title}
+                        </div>
+                        {note.content && (
+                          <div
+                            className={`text-sm mt-1 ${
+                              note.completed ? "text-gray-300" : "text-gray-500"
+                            }`}
+                          >
+                            {note.content}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Indicador de click */}
+                      <div className="text-gray-400 text-sm mt-1">✏️</div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
