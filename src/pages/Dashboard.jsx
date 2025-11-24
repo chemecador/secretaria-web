@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import {
   collection,
+  collectionGroup,
+  query,
+  where,
   addDoc,
   onSnapshot,
   deleteDoc,
@@ -14,6 +17,7 @@ import { db } from "../config/firebase";
 function Dashboard() {
   const { user } = useAuth();
   const [lists, setLists] = useState([]);
+  const [sharedLists, setSharedLists] = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [notes, setNotes] = useState([]);
   const [newListTitle, setNewListTitle] = useState("");
@@ -27,20 +31,40 @@ function Dashboard() {
   const [editContent, setEditContent] = useState("");
   const [editCompleted, setEditCompleted] = useState(false);
 
+  // My lists
   useEffect(() => {
     if (!user) return;
-
-    const q = collection(db, "users", user.uid, "noteslist");
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const listsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+    const colRef = collection(db, "users", user.uid, "noteslist");
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const listsData = snapshot.docs.map((d) => ({
+        id: d.id,
+        ownerUid: user.uid,
+        ...d.data(),
       }));
       setLists(listsData);
       setLoading(false);
     });
+    return unsubscribe;
+  }, [user]);
 
+  // Shared with me
+  useEffect(() => {
+    if (!user) return;
+    const cg = collectionGroup(db, "noteslist");
+    const qShared = query(
+      cg,
+      where("contributors", "array-contains", user.uid)
+    );
+    const unsubscribe = onSnapshot(qShared, (snapshot) => {
+      const data = snapshot.docs
+        .map((d) => ({
+          id: d.id,
+          ownerUid: d.data().contributors?.[0],
+          ...d.data(),
+        }))
+        .filter((l) => l.ownerUid && l.ownerUid !== user.uid);
+      setSharedLists(data);
+    });
     return unsubscribe;
   }, [user]);
 
@@ -49,17 +73,15 @@ function Dashboard() {
       setNotes([]);
       return;
     }
-
     setLoadingNotes(true);
     const notesRef = collection(
       db,
       "users",
-      user.uid,
+      selectedList.ownerUid,
       "noteslist",
       selectedList.id,
       "notes"
     );
-
     const unsubscribe = onSnapshot(notesRef, (snapshot) => {
       const notesData = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -68,7 +90,6 @@ function Dashboard() {
       setNotes(notesData);
       setLoadingNotes(false);
     });
-
     return unsubscribe;
   }, [user, selectedList]);
 
@@ -109,7 +130,7 @@ function Dashboard() {
       const notesRef = collection(
         db,
         "users",
-        user.uid,
+        selectedList.ownerUid,
         "noteslist",
         selectedList.id,
         "notes"
@@ -123,27 +144,6 @@ function Dashboard() {
     }
   };
 
-  const handleToggleNote = async (note) => {
-    if (!selectedList) return;
-
-    try {
-      const noteRef = doc(
-        db,
-        "users",
-        user.uid,
-        "noteslist",
-        selectedList.id,
-        "notes",
-        note.id
-      );
-      await updateDoc(noteRef, {
-        completed: !note.completed,
-      });
-    } catch (error) {
-      console.error("Error al actualizar nota:", error);
-    }
-  };
-
   const handleDeleteNote = async (note) => {
     if (!selectedList) return;
     if (!window.confirm("¿Estás seguro de eliminar esta nota?")) return;
@@ -152,7 +152,7 @@ function Dashboard() {
       const noteRef = doc(
         db,
         "users",
-        user.uid,
+        selectedList.ownerUid,
         "noteslist",
         selectedList.id,
         "notes",
@@ -179,7 +179,7 @@ function Dashboard() {
       const noteRef = doc(
         db,
         "users",
-        user.uid,
+        selectedList.ownerUid,
         "noteslist",
         selectedList.id,
         "notes",
@@ -206,11 +206,11 @@ function Dashboard() {
     setEditCompleted(false);
   };
 
-  const handleDeleteList = async (listId) => {
+  const handleDeleteList = async (list) => {
+    if (!list || list.ownerUid !== user.uid) return;
     if (!window.confirm("¿Estás seguro de eliminar esta lista?")) return;
-
     try {
-      await deleteDoc(doc(db, "users", user.uid, "noteslist", listId));
+      await deleteDoc(doc(db, "users", list.ownerUid, "noteslist", list.id));
     } catch (error) {
       console.error("Error al eliminar lista:", error);
     }
@@ -234,7 +234,6 @@ function Dashboard() {
 
     return (
       <div className="space-y-6">
-        {/* Header con botón de volver */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setSelectedList(null)}
@@ -244,21 +243,22 @@ function Dashboard() {
             <span>Volver</span>
           </button>
           <h1 className="text-3xl font-bold text-gray-900 flex-1">
-            � {selectedList.name}
+            📋 {selectedList.name}
           </h1>
-          <button
-            onClick={() => {
-              handleDeleteList(selectedList.id);
-              setSelectedList(null);
-            }}
-            className="text-red-500 hover:text-red-700 px-4 py-2 rounded"
-            title="Eliminar lista"
-          >
-            🗑️ Eliminar lista
-          </button>
+          {selectedList.ownerUid === user.uid && (
+            <button
+              onClick={() => {
+                handleDeleteList(selectedList);
+                setSelectedList(null);
+              }}
+              className="text-red-500 hover:text-red-700 px-4 py-2 rounded"
+              title="Eliminar lista"
+            >
+              🗑️ Eliminar lista
+            </button>
+          )}
         </div>
 
-        {/* Botón o Formulario para agregar nota */}
         {!showNoteForm ? (
           <button
             onClick={() => setShowNoteForm(true)}
@@ -334,7 +334,6 @@ function Dashboard() {
           </form>
         )}
 
-        {/* Lista de notas */}
         {loadingNotes ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -355,16 +354,16 @@ function Dashboard() {
               {sortedNotes.map((note) => (
                 <div key={note.id}>
                   {editingNote?.id === note.id ? (
-                    // Formulario de edición
                     <div className="p-4 rounded border-2 border-primary-500 bg-primary-50">
                       <form onSubmit={handleSaveEdit}>
                         <div className="space-y-3">
-                          {/* Checkbox de completado */}
                           <div className="flex items-center gap-2 pb-3 border-b border-gray-300">
                             <input
                               type="checkbox"
                               checked={editCompleted}
-                              onChange={(e) => setEditCompleted(e.target.checked)}
+                              onChange={(e) =>
+                                setEditCompleted(e.target.checked)
+                              }
                               className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                               id={`completed-${note.id}`}
                             />
@@ -376,7 +375,6 @@ function Dashboard() {
                             </label>
                           </div>
 
-                          {/* Campo de título */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Título
@@ -391,7 +389,6 @@ function Dashboard() {
                             />
                           </div>
 
-                          {/* Campo de contenido */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Contenido (opcional)
@@ -404,7 +401,6 @@ function Dashboard() {
                             />
                           </div>
 
-                          {/* Botones de acción */}
                           <div className="flex gap-2">
                             <button
                               type="submit"
@@ -422,7 +418,6 @@ function Dashboard() {
                             </button>
                           </div>
 
-                          {/* Botón de eliminar */}
                           <button
                             type="button"
                             onClick={() => {
@@ -437,12 +432,10 @@ function Dashboard() {
                       </form>
                     </div>
                   ) : (
-                    // Vista normal de la nota - solo lectura
                     <div
                       className="flex items-start gap-3 p-3 rounded hover:bg-gray-50 border border-gray-200 cursor-pointer transition-colors"
                       onClick={() => handleStartEdit(note)}
                     >
-                      {/* Indicador visual de completado */}
                       <div className="w-5 h-5 mt-1 flex-shrink-0">
                         {note.completed ? (
                           <span className="text-green-500 text-xl">✓</span>
@@ -451,7 +444,6 @@ function Dashboard() {
                         )}
                       </div>
 
-                      {/* Contenido de la nota */}
                       <div className="flex-1">
                         <div
                           className={`font-medium ${
@@ -473,7 +465,6 @@ function Dashboard() {
                         )}
                       </div>
 
-                      {/* Indicador de click */}
                       <div className="text-gray-400 text-sm mt-1">✏️</div>
                     </div>
                   )}
@@ -488,11 +479,6 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">📋 Mis Listas</h1>
-      </div>
-
-      {/* Formulario para crear lista */}
       <form onSubmit={handleCreateList} className="card">
         <h2 className="text-xl font-semibold mb-4">Crear nueva lista</h2>
         <div className="flex gap-2">
@@ -509,47 +495,84 @@ function Dashboard() {
         </div>
       </form>
 
-      {/* Lista de listas */}
-      {lists.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-500 text-lg">
-            No tienes listas aún. ¡Crea tu primera lista arriba!
-          </p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lists.map((list) => {
-            return (
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">👤 Mis Listas</h2>
+
+        {lists.length === 0 ? (
+          <div className="card text-center py-12">
+            <p className="text-gray-500 text-lg">
+              No tienes listas aún. ¡Crea tu primera lista arriba!
+            </p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {lists.map((list) => {
+              return (
+                <div
+                  key={list.id}
+                  onClick={() => setSelectedList(list)}
+                  className="card cursor-pointer hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-xl font-semibold text-gray-900 flex-1">
+                      {list.name}
+                    </h3>
+                    {list.ownerUid === user.uid && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteList(list);
+                        }}
+                        className="text-red-400 hover:text-red-600 text-sm"
+                        title="Eliminar lista"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+
+                  {list.type && (
+                    <div className="text-sm text-gray-500">{list.type}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          👥 Listas compartidas conmigo
+        </h2>
+        {sharedLists.length === 0 ? (
+          <div className="card text-center py-8">
+            <p className="text-gray-500">No hay listas compartidas todavía.</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sharedLists.map((list) => (
               <div
-                key={list.id}
+                key={list.id + list.ownerUid}
                 onClick={() => setSelectedList(list)}
-                className="card cursor-pointer hover:shadow-lg transition-shadow"
+                className="card cursor-pointer hover:shadow-lg transition-shadow border border-primary-200"
               >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-xl font-semibold text-gray-900 flex-1">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 flex-1">
                     {list.name}
                   </h3>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteList(list.id);
-                    }}
-                    className="text-red-400 hover:text-red-600 text-sm"
-                    title="Eliminar lista"
-                  >
-                    🗑️
-                  </button>
                 </div>
-
-                {/* Tipo de lista si existe */}
+                <div className="text-xs text-gray-500 mb-1">
+                  Propietario: {list.creator}
+                </div>
                 {list.type && (
                   <div className="text-sm text-gray-500">{list.type}</div>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
