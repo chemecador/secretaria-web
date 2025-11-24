@@ -24,6 +24,7 @@ function Dashboard() {
   const [newNoteText, setNewNoteText] = useState("");
   const [newNoteContent, setNewNoteContent] = useState("");
   const [showNoteForm, setShowNoteForm] = useState(false);
+  const [showListForm, setShowListForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
@@ -107,6 +108,7 @@ function Dashboard() {
         date: serverTimestamp(),
       });
       setNewListTitle("");
+      setShowListForm(false);
     } catch (error) {
       console.error("Error al crear lista:", error);
     }
@@ -264,12 +266,12 @@ function Dashboard() {
             onClick={() => setShowNoteForm(true)}
             className="btn-primary w-full py-3"
           >
-            ➕ Agregar nueva nota
+            ➕ Crear nueva nota
           </button>
         ) : (
           <form onSubmit={handleAddNote} className="card">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">✍️ Agregar nueva nota</h2>
+              <h2 className="text-xl font-semibold">✍️ Crear nueva nota</h2>
               <button
                 type="button"
                 onClick={() => {
@@ -316,7 +318,7 @@ function Dashboard() {
                   className="btn-primary flex-1"
                   disabled={!newNoteText.trim()}
                 >
-                  ➕ Agregar Nota
+                  ✅ Crear Nota
                 </button>
                 <button
                   type="button"
@@ -479,22 +481,63 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleCreateList} className="card">
-        <h2 className="text-xl font-semibold mb-4">Crear nueva lista</h2>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newListTitle}
-            onChange={(e) => setNewListTitle(e.target.value)}
-            placeholder="Nombre de la lista..."
-            className="input flex-1"
-          />
-          <button type="submit" className="btn-primary">
-            Crear
-          </button>
-        </div>
-      </form>
+      {!showListForm ? (
+        <button
+          onClick={() => setShowListForm(true)}
+          className="btn-primary w-full py-3"
+        >
+          ➕ Crear nueva lista
+        </button>
+      ) : (
+        <form onSubmit={handleCreateList} className="card">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">📝 Crear nueva lista</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setShowListForm(false);
+                setNewListTitle("");
+              }}
+              className="text-gray-400 hover:text-gray-600"
+              title="Cancelar"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={newListTitle}
+              onChange={(e) => setNewListTitle(e.target.value)}
+              placeholder="Nombre de la lista..."
+              className="input w-full"
+              autoFocus
+              required
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="btn-primary flex-1"
+                disabled={!newListTitle.trim()}
+              >
+                ✅ Crear Lista
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowListForm(false);
+                  setNewListTitle("");
+                }}
+                className="btn-secondary flex-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
+      {/* Sección: Mis Listas */}
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-4">👤 Mis Listas</h2>
 
